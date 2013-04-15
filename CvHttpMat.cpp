@@ -1,15 +1,11 @@
 #include "CvHttpMat.h"
 
-CvHttpMat::CvHttpMat() : url_("")
+CvHttpMat::CvHttpMat() : url_(""), curl_(NULL)
 {
-	curl_ = curl_easy_init();
-	curl_easy_setopt(curl_, CURLOPT_WRITEDATA, (void *)this);
-	curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, CvHttpMat::recv_data_static_);
 }
 
 CvHttpMat::~CvHttpMat()
 {
-	curl_easy_cleanup(curl_);
 }
 
 std::string CvHttpMat::url() const
@@ -20,8 +16,6 @@ std::string CvHttpMat::url() const
 void CvHttpMat::url(const std::string &val)
 {
 	this->url_ = val;
-
-	curl_easy_setopt(curl_, CURLOPT_URL, url_.c_str());
 }
 
 cv::Mat CvHttpMat::image() const
@@ -33,6 +27,11 @@ void CvHttpMat::clear()
 {
 	image_.release();
 	recv_buf_.clear();
+
+	if (curl_ != NULL) {
+		curl_easy_cleanup(curl_);
+		curl_ = NULL;
+	}
 }
 
 bool CvHttpMat::download()
@@ -40,6 +39,11 @@ bool CvHttpMat::download()
 	CURLcode res;
 
 	recv_buf_.clear();
+
+	curl_ = curl_easy_init();
+	curl_easy_setopt(curl_, CURLOPT_URL, url_.c_str());
+	curl_easy_setopt(curl_, CURLOPT_WRITEDATA, (void *)this);
+	curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, CvHttpMat::recv_data_static_);
 
 	res = curl_easy_perform(curl_);
 
@@ -54,6 +58,9 @@ bool CvHttpMat::download()
 		clear();
 		return false;
 	}
+
+	curl_easy_cleanup(curl_);
+	curl_ = NULL;
 
 	return true;
 }
